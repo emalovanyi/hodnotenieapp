@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GymBeam — rating & feedback flow</title>
+<style>
+  :root{
+    --accent:#1FBF6B;        /* vymen za GymBeam brand farbu */
+    --accent-dark:#16A34A;
+    --bg:#0B0F14; --surface:#141A21; --surface-2:#1C242E;
+    --line:#2A323D; --text:#E7ECF1; --muted:#8C97A4;
+    --ok:#46D389; --warn:#F2B33D; --bad:#F4736B;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);min-height:100vh}
+  /* top nav */
+  .nav{position:sticky;top:0;z-index:50;display:flex;gap:8px;justify-content:center;
+    padding:16px;background:rgba(11,15,20,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .nav button{border:1px solid var(--line);background:var(--surface);color:var(--muted);
+    padding:10px 18px;border-radius:999px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s}
+  .nav button.on{background:var(--accent);border-color:var(--accent);color:#04210f}
+  .page{display:none;max-width:760px;margin:0 auto;padding:28px 20px 70px}
+  .page.on{display:block}
+
+  /* ---- page 1 (docs) ---- */
+  h1{font-size:22px;margin:6px 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 26px;line-height:1.5}
+  .block{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+  .block h2{font-size:15px;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+  .num{width:24px;height:24px;border-radius:7px;background:var(--accent);color:#04210f;display:grid;place-items:center;font-size:13px;font-weight:800;flex:0 0 auto}
+  .step{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.55}
+  .step:last-child{border-bottom:0}
+  .step .k{color:var(--accent);font-weight:700;flex:0 0 96px}
+  .step b{color:var(--text)}
+  .block p{font-size:13.5px;line-height:1.6;color:var(--text);margin:0 0 10px}
+  .block p.m{color:var(--muted)}
+  a{color:var(--accent);text-decoration:none;word-break:break-all}
+  a:hover{text-decoration:underline}
+  code{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px;color:#cfe9da}
+  .api{border-left:3px solid var(--accent);padding-left:14px;margin-bottom:18px}
+  .api h3{font-size:14px;margin:0 0 6px}
+  .api p{font-size:12.5px;margin:3px 0;color:var(--muted)}
+  .do{border-left:3px solid var(--ok);padding-left:14px;margin-bottom:14px}
+  .dont{border-left:3px solid var(--bad);padding-left:14px}
+  .do h3,.dont h3{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.4px}
+  .do h3{color:var(--ok)} .dont h3{color:var(--bad)}
+  .do li,.dont li{font-size:13px;line-height:1.6;margin-bottom:5px}
+  ul{margin:0;padding-left:18px}
+  .tip{font-size:12.5px;color:var(--muted);background:rgba(242,179,61,.07);border:1px solid rgba(242,179,61,.25);border-radius:10px;padding:12px;line-height:1.55}
+
+  /* ---- page 3 (compare) ---- */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:640px){.two{grid-template-columns:1fr}}
+  .cmp{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .cmp.best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .cmp .head{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .pill{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:4px 9px;border-radius:999px}
+  .pill.a{background:var(--accent);color:#04210f}
+  .pill.b{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+  .cmp h2{font-size:15px;margin:0 0 2px}
+  .cmp .uses{font-size:12px;color:var(--muted);margin:0 0 14px}
+  .cmp h4{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:14px 0 7px}
+  .cmp ul{padding-left:16px;margin:0}
+  .cmp li{font-size:12.5px;line-height:1.55;margin-bottom:5px}
+  .cmp li.p::marker{content:"✓  "} .cmp li.p{color:var(--text)}
+  .cmp li.n::marker{content:"✕  "} .cmp li.n{color:var(--muted)}
+  .flow-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--text);margin:8px 0 2px}
+  .node{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+  .node.acc{background:var(--accent);color:#04210f;border-color:var(--accent);font-weight:700}
+  .arr{color:var(--muted)}
+  /* timeline */
+  .tl{position:relative;padding-left:26px}
+  .tl::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .ev{position:relative;padding:0 0 16px}
+  .ev::before{content:"";position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:3px solid var(--bg)}
+  .ev .when{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.3px}
+  .ev .what{font-size:13px;line-height:1.55;margin-top:2px}
+  .ev .what b{color:var(--text)}
+  .ev .tag2{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:5px}
+  .tag-nat{background:rgba(242,179,61,.14);color:var(--warn)}
+  .tag-dl{background:rgba(70,211,137,.14);color:var(--ok)}
+  .tag-fb{background:rgba(244,115,107,.14);color:var(--bad)}
+
+  /* ---- page 2 (phone) ---- */
+  .stage{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .hint{color:var(--muted);font-size:13px;text-align:center;max-width:340px;line-height:1.5}
+  .phone{width:330px;height:660px;background:#0E1116;border-radius:40px;border:9px solid #000;
+    box-shadow:0 24px 60px rgba(0,0,0,.55);position:relative;overflow:hidden}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:24px;background:#000;border-radius:0 0 16px 16px;z-index:40}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column}
+  .statusbar{height:44px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 20px 6px;font-size:11px;color:var(--muted)}
+  .appbar{padding:8px 16px 13px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+  .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));display:grid;place-items:center;font-weight:800;color:#04210f}
+  .appbar b{font-size:14px}
+  .content{flex:1;overflow:auto;padding:16px}
+  .order{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(70,211,137,.12);color:var(--ok);font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;margin-bottom:10px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+  .order h3{margin:2px 0 4px;font-size:14px}
+  .order p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+  .trigger{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-weight:700;font-size:13px;cursor:pointer;background:var(--accent);color:#04210f}
+
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.25s;z-index:30}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:24px 24px 0 0;
+    padding:22px 20px 26px;transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.2,1);z-index:31;border-top:1px solid var(--line)}
+  .sheet.show{transform:translateY(0)}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
+  .sheet h2{font-size:17px;margin:0 0 6px;text-align:center}
+  .sheet .ssub{color:var(--muted);font-size:12.5px;text-align:center;margin:0 0 18px;line-height:1.5}
+  .faces{display:flex;justify-content:center;gap:12px}
+  .face{flex:1;height:88px;border:1px solid var(--line);background:var(--surface-2);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s;color:var(--text);font-size:12px}
+  .face:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .emo{font-size:28px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+  .chip{font-size:12px;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);cursor:pointer}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#04210f;font-weight:700}
+  .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+  textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font:inherit;font-size:13px;resize:none;height:64px}
+  .btn{display:block;width:100%;margin-top:14px;border:0;border-radius:13px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;background:var(--accent);color:#04210f}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600;margin-top:9px}
+  .center{text-align:center}
+  .check{width:60px;height:60px;border-radius:50%;background:rgba(70,211,137,.12);display:grid;place-items:center;margin:4px auto 12px;font-size:28px}
+  .native{border:1px dashed var(--warn);border-radius:14px;padding:14px;background:rgba(242,179,61,.06)}
+  .native .tag{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--warn);text-transform:uppercase}
+  .stars{font-size:24px;letter-spacing:4px;color:var(--warn);margin:8px 0}
+  .native small{color:var(--muted);font-size:11px;line-height:1.5;display:block}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <button id="t1" class="on" onclick="go(1)">1 · Logika & pravidla</button>
+  <button id="t2" onclick="go(2)">2 · Flow (prototyp)</button>
+  <button id="t3" onclick="go(3)">3 · Kedy co pouzit</button>
+</div>
+
+<!-- ============ PAGE 1 ============ -->
+<div class="page on" id="p1">
+  <h1>Rating & feedback flow</h1>
+  <p class="sub">Ako sa ma modal spravat, kedy ho spustit, a co sa smie / nesmie. Samotny klikatelny flow je na strane 2.</p>
+
+  <div class="block">
+    <h2><span class="num">1</span>Ako sa ma modal spravat</h2>
+    <div class="step"><span class="k">Kontrola</span><span>Pred zobrazenim sa ticho overí, ci je user vhodny: <b>nie je novy</b> (≥ 3 dni, ≥ 1 objednavka), <b>nezazil error/crash</b> v poslednych 2–3 sessions, a <b>nie je v cooldowne</b> (uz hodnotil / nedavno videl prompt).</span></div>
+    <div class="step"><span class="k">Krok 1</span><span>Ukaze sa <b>maly sentiment modal</b> (tvoj dizajn): „Ako sa ti nakupuje cez appku?" 😟 😐 😍</span></div>
+    <div class="step"><span class="k">Spokojny</span><span>→ posunie sa do obchodu cez <b>deeplink</b> (App Store / Play Store), kde napise recenziu.</span></div>
+    <div class="step"><span class="k">Nespokojny</span><span>→ otvori sa <b>in-app feedback formular</b> (zostane v appke, ide na support) + diskretna moznost ist aj do obchodu.</span></div>
+  </div>
+
+  <div class="block">
+    <h2><span class="num">2</span>Najlepsi moment, kedy to spustit</h2>
+    <p><b>Po uspesnej objednavke — idealne po doruceni.</b> Pripadne po N-tej uspesnej akcii. Vzdy v prirodzenej prestavke, nikdy uprostred ukonu a nikdy hned po chybe.</p>
+    <p class="m">Takto prompt uvidia hlavne ludia, ktorym appka prave funguje — co je presne to, co teraz chyba.</p>
+  </div>
+
+  <div class="block">
+    <h2><span class="num">3</span>API a odkazy</h2>
+    <div class="api">
+      <h3>iOS — StoreKit: SKStoreReviewController</h3>
+      <p>Volanie: <code>requestReview(in:)</code> · SwiftUI <code>@Environment(\.requestReview)</code></p>
+      <p>Doc: <a href="https://developer.apple.com/documentation/storekit/skstorereviewcontroller" target="_blank">developer.apple.com/documentation/storekit/skstorereviewcontroller</a></p>
+      <p>Pravidla (HIG): <a href="https://developer.apple.com/design/human-interface-guidelines/ratings-and-reviews" target="_blank">…/human-interface-guidelines/ratings-and-reviews</a></p>
+      <p>Deeplink na recenziu: <code>https://apps.apple.com/app/id&lt;APP_ID&gt;?action=write-review</code></p>
+    </div>
+    <div class="api">
+      <h3>Android — Google Play In-App Review API</h3>
+      <p>Volanie: <code>ReviewManagerFactory.create()</code> → <code>requestReviewFlow()</code> → <code>launchReviewFlow()</code></p>
+      <p>Doc: <a href="https://developer.android.com/guide/playcore/in-app-review" target="_blank">developer.android.com/guide/playcore/in-app-review</a></p>
+      <p>Integracia: <a href="https://developer.android.com/guide/playcore/in-app-review/kotlin-java" target="_blank">…/in-app-review/kotlin-java</a></p>
+      <p>Deeplink: <code>https://play.google.com/store/apps/details?id=com.gymbeam.app</code></p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2><span class="num">4</span>Obmedzenia podla obchodu</h2>
+    <p><b>iOS:</b> nativny prompt sa ukaze <b>max 3× za rok</b> na usera, limit rieši systém. Nevidis vysledok a nevies ho spolahlivo vyvolat z tlacidla → na tlacidlo „Ohodnotit appku" pouzi deeplink.</p>
+    <p><b>Android:</b> casovo viazana <b>kvota</b> (presnu hodnotu Google netají­, moze ju kedykolvek zmenit; prakticky ~nie viac ako raz za cca mesiac). API neprezradí, ci sa dialog ukazal ani ako user hodnotil.</p>
+  </div>
+
+  <div class="block">
+    <h2><span class="num">5</span>Co sa smie a nesmie</h2>
+    <div class="do">
+      <h3>✓ Robit</h3>
+      <ul>
+        <li>Spustat v dobrom momente (po doruceni).</li>
+        <li>Sentiment modal a feedback formular si dizajnovat pod GymBeam.</li>
+        <li>Spokojnych poslat do obchodu, nespokojnych na in-app feedback.</li>
+        <li>Nechat nespokojnym aj cestu do obchodu (neblokovat ich).</li>
+      </ul>
+    </div>
+    <div class="dont">
+      <h3>✕ Nerobit</h3>
+      <ul>
+        <li>Pytat nazor/otazku tesne pred <b>nativnou</b> kartou (Google to zakazuje).</li>
+        <li>Menit alebo prekryvat nativnu kartu — neda sa dizajnovat.</li>
+        <li>Davat incentivy za recenziu (zlavy, body za hviezdy).</li>
+        <li>Vlastne „hviezdickove" okno namiesto nativneho API.</li>
+      </ul>
+    </div>
+    <p class="tip" style="margin-top:14px"><b>Preto</b> v prototype spokojna vetva po smajlikoch ide na <b>store deeplink</b>, nie na nativnu kartu. Nativny in-app prompt sa vola <b>ticho, bez predchadzajucej otazky</b> — samostatne v tom istom dobrom momente.</p>
+  </div>
+</div>
+
+<!-- ============ PAGE 2 ============ -->
+<div class="page" id="p2">
+  <div class="stage">
+    <p class="hint">Klikni na <b>„Ohodnotit nakup"</b> v telefone a prejdi si cely flow.</p>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+        <div class="appbar"><div class="logo">G</div><b>GymBeam</b></div>
+        <div class="content">
+          <div class="order">
+            <span class="badge"><i class="dot"></i> Objednavka dorucena</span>
+            <h3>Objednavka #GB-204815</h3>
+            <p>Whey Protein 1000 g · BCAA · Shaker — dorucene dnes. Dakujeme za nakup!</p>
+            <button class="trigger" onclick="sentiment()">Ohodnotit nakup</button>
+          </div>
+        </div>
+        <div class="scrim" id="scrim"></div>
+        <div class="sheet" id="sheet"><div class="grab"></div><div id="body"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PAGE 3 ============ -->
+<div class="page" id="p3">
+  <h1>Kedy co pouzit</h1>
+  <p class="sub">Dva pristupy. Mozes ich kombinovat, alebo zacat len jednym. Nizsie je porovnanie, pravidla, obmedzenia a konkretny priklad scenara.</p>
+
+  <div class="two">
+    <!-- Scenario A -->
+    <div class="cmp">
+      <div class="head"><span class="pill b">Scenar A</span></div>
+      <h2>Nativny modal + deeplink</h2>
+      <p class="uses">Maximalna konverzia. Viac prace pre dev tim.</p>
+
+      <h4>Ako to funguje</h4>
+      <div class="flow-line">
+        <span class="node">dobry moment</span><span class="arr">→</span>
+        <span class="node acc">nativny prompt</span><span class="arr">(v appke)</span>
+      </div>
+      <div class="flow-line">
+        <span class="node">tlacidlo „Ohodnotit"</span><span class="arr">→</span>
+        <span class="node acc">deeplink</span><span class="arr">(do obchodu)</span>
+      </div>
+      <p class="block-p" style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:8px 0 0">
+        Nativny prompt sa vola <b>ticho, bez otazky</b> po doruceni — user da hviezdy bez opustenia appky.
+        Deeplink visi na explicitnom tlacidle a na „Super 😍" vetve.</p>
+
+      <h4>Plusy</h4>
+      <ul><li class="p">Najmensi odpad — user neopusti appku.</li>
+          <li class="p">Vyssia sance, ze recenziu naozaj dopise.</li>
+          <li class="p">Deeplink pokryva tlacidla bez kvoty.</li></ul>
+      <h4>Minusy</h4>
+      <ul><li class="n">Viac integracie (StoreKit + Play In-App Review kniznica).</li>
+          <li class="n">Nativny prompt ma kvotu a nevies, ci sa ukazal.</li></ul>
+
+      <h4>Obmedzenia</h4>
+      <ul><li class="n">iOS: nativny prompt max <b>3×/rok</b> na usera (riadi Apple).</li>
+          <li class="n">Android: nezverejnena kvota (~radovo raz mesacne, moze sa zmenit).</li>
+          <li class="n">Nativny prompt nikdy nenapajat na tlacidlo.</li></ul>
+    </div>
+
+    <!-- Scenario B -->
+    <div class="cmp best">
+      <div class="head"><span class="pill a">Scenar B · start sem</span></div>
+      <h2>Len deeplink</h2>
+      <p class="uses">Plna kontrola, rychle nasadenie. O nieco vacsi odpad.</p>
+
+      <h4>Ako to funguje</h4>
+      <div class="flow-line">
+        <span class="node">vase pravidla<br>(napr. 1×/2 mes.)</span><span class="arr">→</span>
+        <span class="node">vlastny modal</span><span class="arr">→</span>
+        <span class="node acc">deeplink</span>
+      </div>
+      <p class="block-p" style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:8px 0 0">
+        Ziaden nativny prompt. Vy plne riadite kedy a komu — Apple/Google do toho nehovoria,
+        lebo je to vas modal. Klik posiela usera do obchodu (deeplink nema kvotu).</p>
+
+      <h4>Plusy</h4>
+      <ul><li class="p">Plna kontrola nad casovanim a podmienkami.</li>
+          <li class="p">Jednoduchsia integracia — len otvorenie URL.</li>
+          <li class="p">Funguje vzdy, ziadna kvota.</li></ul>
+      <h4>Minusy</h4>
+      <ul><li class="n">User na chvilu odide do obchodu = o nieco vacsi odpad.</li>
+          <li class="n">O krok dlhsia cesta nez nativny prompt.</li></ul>
+
+      <h4>Obmedzenia / pravidla</h4>
+      <ul><li class="n">Vlastny modal nesmie vyzerat ako systemove hviezdickove okno.</li>
+          <li class="n">Nesmie filtrovat negativnych (nechaj im aj cestu do obchodu).</li>
+          <li class="n">Ziadne incentivy za recenziu (zlavy/body).</li></ul>
+    </div>
+  </div>
+
+  <!-- example scenario -->
+  <div class="block" style="margin-top:18px">
+    <h2><span class="num">★</span>Priklad scenara — presne kedy, ako, co</h2>
+    <p class="m" style="margin-bottom:16px">User „Martin", ma appku 5 mesiacov. Ukazka, co sa kedy spusti pri <b>kombinacii A+B</b>.</p>
+    <div class="tl">
+      <div class="ev"><div class="when">Den 1 — instalacia</div>
+        <div class="what">Martin si stiahne appku, prva objednavka. <b>Nic sa nespusti</b> — je novy (&lt; 3 dni, eligibility FAIL).</div></div>
+      <div class="ev"><div class="when">Den 12 — 3. objednavka dorucena</div>
+        <div class="what">Splnene podmienky: nie je novy, ≥ 3 objednavky, ziaden error za 3 dni. Appka <b>ticho zavola nativny prompt</b> po doruceni — Martin da 5★ bez opustenia appky.</div>
+        <div class="tag2 tag-nat">nativny prompt (Scenar A)</div></div>
+      <div class="ev"><div class="when">Den 40 — chyba pri platbe</div>
+        <div class="what">Pri objednavke spadne platba. Appka <b>nespusti ziaden rating</b> (error v poslednych sessions = FAIL). Namiesto toho sa Martinovi ukaze diskretne <b>„Nahlasit problem"</b>.</div>
+        <div class="tag2 tag-fb">in-app feedback</div></div>
+      <div class="ev"><div class="when">Den 55 — sam ide do nastaveni</div>
+        <div class="what">Martin chce appku pochvalit, klikne <b>„Ohodnotit appku"</b>. Nativny prompt uz vycerpal kvotu → preto je tu <b>deeplink</b>, ktory ho vzdy otvori v App Store / Play Store.</div>
+        <div class="tag2 tag-dl">deeplink (Scenar B)</div></div>
+      <div class="ev"><div class="when">Den 70 — 6. objednavka, sentiment modal</div>
+        <div class="what">Vasa kvota „1×/2 mesiace" je volna. Ukaze sa <b>sentiment modal</b> (😟 😐 😍). Martin klikne 😍 → posle ho <b>deeplink</b> do obchodu. Keby klikol 😟 → in-app feedback, nie do obchodu.</div>
+        <div class="tag2 tag-dl">deeplink (Scenar B)</div></div>
+    </div>
+    <p class="tip" style="margin-top:8px"><b>Odporucanie:</b> zacnite <b>Scenarom B</b> (len deeplink + vase pravidla) — rychle, plne pod kontrolou. Ked budete chciet vyssiu konverziu, pridajte nativny prompt pre „happy moment" po doruceni (Scenar A). Tym pobezia paralelne: nativny pre bezstrkovy moment, deeplink pre vase tlacidla.</p>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+function go(n){
+  for(let i=1;i<=3;i++){
+    $('p'+i).classList.toggle('on',i===n);
+    $('t'+i).classList.toggle('on',i===n);
+  }
+  window.scrollTo(0,0);
+}
+function open(html){ $('body').innerHTML=html; $('scrim').classList.add('show'); $('sheet').classList.add('show'); }
+function close(){ $('scrim').classList.remove('show'); $('sheet').classList.remove('show'); }
+document.getElementById('scrim').onclick=close;
+
+function sentiment(){ open(`
+  <h2>Ako sa ti nakupuje cez appku?</h2>
+  <p class="ssub">Tvoj nazor nam pomoze appku zlepsit.</p>
+  <div class="faces">
+    <div class="face" onclick="unhappy()"><span class="emo">😟</span>Slabsie</div>
+    <div class="face" onclick="unhappy()"><span class="emo">😐</span>Ako tak</div>
+    <div class="face" onclick="happy()"><span class="emo">😍</span>Super</div>
+  </div>
+  <button class="btn ghost" onclick="close()">Teraz nie</button>`); }
+
+function happy(){ open(`
+  <div class="center"><div class="check">⭐</div>
+    <h2>Super, dakujeme!</h2>
+    <p class="ssub">Pomoze nam, ak to napises aj v obchode.</p></div>
+  <div class="native">
+    <span class="tag">Simulacia — toto vlastni Apple / Google</span>
+    <div class="stars">★ ★ ★ ★ ★</div>
+    <small>iOS: <code>?action=write-review</code> · Android: <code>market://details?id=…</code><br>Tento ekran sa neda dizajnovat.</small>
+  </div>
+  <button class="btn" onclick="thanks('Otvorene v obchode (simulacia).')">Ohodnotit v obchode</button>
+  <button class="btn ghost" onclick="close()">Mozno neskor</button>`); }
+
+const CATS=['Rychlost','Dokoncenie objednavky','Platba','Kosik','Prihlasenie','Vyhladavanie','Jazyk','Vratenie','Notifikacie','Ine'];
+function unhappy(){ open(`
+  <h2>Co ti nesadlo?</h2>
+  <p class="ssub">Posli to priamo nam — pozrieme sa na to. Neopustas appku.</p>
+  <div class="lbl">Oblast (vyber 1+)</div>
+  <div class="chips">${CATS.map(c=>`<span class="chip" onclick="this.classList.toggle('on')">${c}</span>`).join('')}</div>
+  <textarea placeholder="Napis nam viac (nepovinne)…"></textarea>
+  <button class="btn" onclick="thanks('Feedback odoslany na support (simulacia).')">Odoslat spatnu vazbu</button>
+  <button class="btn ghost" onclick="happy()">Radsej ohodnotit v obchode</button>`); }
+
+function thanks(msg){ open(`
+  <div class="center"><div class="check">✅</div>
+    <h2>Dakujeme!</h2><p class="ssub">${msg}</p></div>
+  <button class="btn" onclick="close()">Hotovo</button>`); }
+</script>
+</body>
+</html>
