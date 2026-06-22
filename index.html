@@ -114,6 +114,10 @@
   .face{flex:1;height:88px;border:1px solid var(--line);background:var(--surface-2);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s;color:var(--text);font-size:12px}
   .face:hover{border-color:var(--accent);transform:translateY(-2px)}
   .emo{font-size:28px}
+  .rate{display:flex;justify-content:center;gap:10px;font-size:40px;margin:8px 0 2px;cursor:pointer;user-select:none}
+  .rate .st{color:var(--line);transition:transform .1s,color .1s;line-height:1}
+  .rate .st.hot{color:var(--warn);transform:scale(1.1)}
+  .rateHint{color:var(--muted);font-size:12.5px;text-align:center;min-height:16px;margin:10px 0 0}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
   .chip{font-size:12px;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);cursor:pointer}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#04210f;font-weight:700}
@@ -145,9 +149,10 @@
   <div class="block">
     <h2><span class="num">1</span>Ako sa ma modal spravat</h2>
     <div class="step"><span class="k">Kontrola</span><span>Pred zobrazenim sa ticho overí, ci je user vhodny: <b>nie je novy</b> (≥ 3 dni, ≥ 1 objednavka), <b>nezazil error/crash</b> v poslednych 2–3 sessions, a <b>nie je v cooldowne</b> (uz hodnotil / nedavno videl prompt).</span></div>
-    <div class="step"><span class="k">Krok 1</span><span>Ukaze sa <b>maly sentiment modal</b> (tvoj dizajn): „Ako sa ti nakupuje cez appku?" 😟 😐 😍</span></div>
-    <div class="step"><span class="k">Spokojny</span><span>→ posunie sa do obchodu cez <b>deeplink</b> (App Store / Play Store), kde napise recenziu.</span></div>
-    <div class="step"><span class="k">Nespokojny</span><span>→ otvori sa <b>in-app feedback formular</b> (zostane v appke, ide na support) + diskretna moznost ist aj do obchodu.</span></div>
+    <div class="step"><span class="k">Krok 1</span><span>Ukaze sa <b>maly rating modal</b> (tvoj dizajn, GymBeam): „Ako sa ti paci appka?" ★★★★★</span></div>
+    <div class="step"><span class="k">4–5 ★</span><span>→ posunie sa do obchodu cez <b>deeplink</b> (App Store / Play Store), kde zada realny rating.</span></div>
+    <div class="step"><span class="k">1–3 ★</span><span>→ otvori sa <b>in-app feedback formular</b> „co nepacilo" (zostane v appke, ide na support) + dole nenapadne <b>„Ohodnotit aj v obchode"</b> (neblokujeme ho).</span></div>
+    <div class="step"><span class="k">Pozn.</span><span>Hviezdy v modale su len <b>smerovanie nalady</b> — neukladaju sa ako vas rating. Realny rating vznikne az v obchode.</span></div>
   </div>
 
   <div class="block">
@@ -251,7 +256,7 @@
       </div>
       <p class="block-p" style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:8px 0 0">
         Nativny prompt sa vola <b>ticho, bez otazky</b> po doruceni — user da hviezdy bez opustenia appky.
-        Deeplink visi na explicitnom tlacidle a na „Super 😍" vetve.</p>
+        Deeplink visi na explicitnom tlacidle a na „4–5★" vetve.</p>
 
       <h4>Plusy</h4>
       <ul><li class="p">Najmensi odpad — user neopusti appku.</li>
@@ -314,8 +319,8 @@
       <div class="ev"><div class="when">Den 55 — sam ide do nastaveni</div>
         <div class="what">Martin chce appku pochvalit, klikne <b>„Ohodnotit appku"</b>. Nativny prompt uz vycerpal kvotu → preto je tu <b>deeplink</b>, ktory ho vzdy otvori v App Store / Play Store.</div>
         <div class="tag2 tag-dl">deeplink (Scenar B)</div></div>
-      <div class="ev"><div class="when">Den 70 — 6. objednavka, sentiment modal</div>
-        <div class="what">Vasa kvota „1×/2 mesiace" je volna. Ukaze sa <b>sentiment modal</b> (😟 😐 😍). Martin klikne 😍 → posle ho <b>deeplink</b> do obchodu. Keby klikol 😟 → in-app feedback, nie do obchodu.</div>
+      <div class="ev"><div class="when">Den 70 — 6. objednavka, rating modal</div>
+        <div class="what">Vasa kvota „1×/2 mesiace" je volna. Ukaze sa <b>rating modal</b> (★★★★★). Martin da <b>5★</b> → posle ho <b>deeplink</b> do obchodu. Keby dal <b>1–3★</b> → in-app feedback „co nepacilo" + dole moznost ist aj do obchodu.</div>
         <div class="tag2 tag-dl">deeplink (Scenar B)</div></div>
     </div>
     <p class="tip" style="margin-top:8px"><b>Odporucanie:</b> zacnite <b>Scenarom B</b> (len deeplink + vase pravidla) — rychle, plne pod kontrolou. Ked budete chciet vyssiu konverziu, pridajte nativny prompt pre „happy moment" po doruceni (Scenar A). Tym pobezia paralelne: nativny pre bezstrkovy moment, deeplink pre vase tlacidla.</p>
@@ -336,14 +341,20 @@ function close(){ $('scrim').classList.remove('show'); $('sheet').classList.remo
 document.getElementById('scrim').onclick=close;
 
 function sentiment(){ open(`
-  <h2>Ako sa ti nakupuje cez appku?</h2>
-  <p class="ssub">Tvoj nazor nam pomoze appku zlepsit.</p>
-  <div class="faces">
-    <div class="face" onclick="unhappy()"><span class="emo">😟</span>Slabsie</div>
-    <div class="face" onclick="unhappy()"><span class="emo">😐</span>Ako tak</div>
-    <div class="face" onclick="happy()"><span class="emo">😍</span>Super</div>
+  <h2>Ako sa ti paci appka?</h2>
+  <p class="ssub">Klikni pocet hviezd.</p>
+  <div class="rate" id="rate">
+    ${[1,2,3,4,5].map(n=>`<span class="st" data-v="${n}" onmouseover="hoverStar(${n})" onmouseout="hoverStar(0)" onclick="clickStar(${n})">★</span>`).join('')}
   </div>
+  <p class="rateHint" id="rateHint">&nbsp;</p>
   <button class="btn ghost" onclick="close()">Teraz nie</button>`); }
+
+function hoverStar(n){
+  document.querySelectorAll('#rate .st').forEach(s=>s.classList.toggle('hot', parseInt(s.dataset.v)<=n));
+  const h=$('rateHint'); if(!h) return;
+  h.textContent = n>=4 ? 'Super! Posleme ta do obchodu →' : (n>=1 ? 'Povedz nam, co zlepsit' : '\u00A0');
+}
+function clickStar(n){ n>=4 ? happy() : unhappy(); }
 
 function happy(){ open(`
   <div class="center"><div class="check">⭐</div>
